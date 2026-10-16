@@ -1,6 +1,6 @@
 import uuid
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 from pydantic_core import PydanticCustomError
@@ -44,12 +44,18 @@ class CreditApplicationCreate(BaseModel):
     def validate_amount(cls, value: Decimal) -> Decimal:
         # Primero el formato (decimales) y después el rango: así se corrige un error a la vez
         # Pydantic ya rechaza NaN e Infinity para Decimal, por lo que aquí el valor es finito
-        if value != value.quantize(_CENTS):
+        out_of_range = PydanticCustomError(
+            "amount_range", "El monto debe estar entre $500.00 y $50,000.00."
+        )
+        try:
+            has_extra_decimals = value != value.quantize(_CENTS)
+        except InvalidOperation:
+            # Con más de 28 dígitos significativos quantize falla: ya es un monto fuera de rango
+            raise out_of_range from None
+        if has_extra_decimals:
             raise PydanticCustomError("amount_decimals", "El monto admite como máximo 2 decimales.")
         if not rules.MIN_AMOUNT <= value <= rules.MAX_AMOUNT:
-            raise PydanticCustomError(
-                "amount_range", "El monto debe estar entre $500.00 y $50,000.00."
-            )
+            raise out_of_range
         return value
 
     @field_validator("term_months", mode="after")

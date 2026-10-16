@@ -1,5 +1,7 @@
 import uuid
 
+import pytest
+
 BASE = "/api/v1/credit-applications"
 VALID = {"applicant_document": "8-430-70", "amount": 1000, "term_months": 12}
 
@@ -29,6 +31,21 @@ def test_create_invalid_returns_422_with_field_errors(client):
         "message": "El monto debe estar entre $500.00 y $50,000.00.",
     } in body["errors"]
     assert "applicant_document" in [e["field"] for e in body["errors"]]
+
+
+@pytest.mark.parametrize(
+    "raw_amount", ['"NaN"', "1e999", "1e26", '"1e30"', "99999999999999999999999999999"]
+)
+def test_create_with_extreme_amount_returns_422_and_persists_nothing(client, raw_amount):
+    body = f'{{"applicant_document":"8-430-70","amount":{raw_amount},"term_months":12}}'
+
+    response = client.post(BASE, content=body, headers={"content-type": "application/json"})
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert payload["type"] == "validation_error"
+    assert "amount" in [e["field"] for e in payload["errors"]]
+    assert client.get(BASE).json()["total"] == 0
 
 
 def test_create_malformed_json_returns_400(client):

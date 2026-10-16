@@ -49,6 +49,14 @@ def test_non_finite_amount_is_rejected(amount):
         create(amount=amount)
 
 
+@pytest.mark.parametrize("amount", [10**26, "1e26", "1e30", "9" * 29])
+def test_huge_amount_is_rejected_as_out_of_range(amount):
+    # quantize lanza InvalidOperation con más de 28 dígitos significativos
+    with pytest.raises(ValidationError) as exc:
+        create(amount=amount)
+    assert error_types(exc.value) == {"amount_range"}
+
+
 def test_amount_range_message_is_in_spanish():
     with pytest.raises(ValidationError) as exc:
         create(amount="499.99")
