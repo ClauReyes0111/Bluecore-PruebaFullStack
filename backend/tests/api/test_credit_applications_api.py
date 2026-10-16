@@ -96,6 +96,15 @@ def test_list_limit_above_maximum_returns_422(client):
     assert response.json()["errors"][0]["field"] == "limit"
 
 
+def test_list_offset_above_maximum_returns_422(client):
+    response = client.get(BASE, params={"offset": 10**30})
+
+    assert response.status_code == 422
+    assert {"field": "offset", "message": "Debe ser menor o igual a 1000000."} in response.json()[
+        "errors"
+    ]
+
+
 def test_list_offset_beyond_total_returns_empty_items(client):
     create(client)
     create(client)

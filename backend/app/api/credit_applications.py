@@ -60,7 +60,7 @@ def create_application(
 def list_applications(
     status: ApplicationStatus | None = None,
     limit: int = Query(20, ge=1, le=100),
-    offset: int = Query(0, ge=0),
+    offset: int = Query(0, ge=0, le=1_000_000),
     service: CreditApplicationService = Depends(get_service),
 ) -> CreditApplicationPage:
     items, total = service.list(status, limit, offset)
