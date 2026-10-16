@@ -1,5 +1,7 @@
 services:
   db:
+    # Solo se levanta con: docker compose --profile local-db up
+    profiles: ["local-db"]
     # Misma versión mayor que la Aurora PostgreSQL de Bluecore (16)
     image: postgres:16
     environment:
@@ -18,6 +20,28 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+  backend:
+    build: ./backend
+    # DATABASE_URL (y demás variables) se leen del .env de la raíz
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+        # db solo existe con el perfil local-db; con Aurora se omite esta dependencia
+        required: false
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres_data:
