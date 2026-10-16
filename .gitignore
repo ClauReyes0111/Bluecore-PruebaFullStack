@@ -1,0 +1,17 @@
+# Variables de entorno con credenciales: nunca se suben
+.env
+
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.db
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+
+# Enunciado de la prueba (contiene credenciales)
+Prueba_Bluecore*
