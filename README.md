@@ -9,7 +9,7 @@ Aplicación full stack para gestionar solicitudes de crédito: crear solicitudes
 | API | FastAPI + Uvicorn | 0.143.2 / 0.54.0 |
 | Datos | SQLAlchemy + Alembic + psycopg 3 | 2.1.4 / 1.20.0 / 3.3.6 |
 | Configuración | pydantic-settings | 2.16.0 |
-| Base de datos | PostgreSQL (Docker) | 16 |
+| Base de datos | PostgreSQL (Aurora de Bluecore o Docker local) | 16 |
 | Frontend | Angular (standalone, Reactive Forms) | 22.2 |
 | Tests | pytest + httpx / Vitest (runner de Angular) | 9.1.1 + 2.13.1 / 5.0 |
 | Calidad | Ruff | 0.17.1 |
@@ -17,20 +17,43 @@ Aplicación full stack para gestionar solicitudes de crédito: crear solicitudes
 ## Requisitos previos
 
 - Docker Desktop (con `docker compose`)
-- Python 3.13 o superior
-- Node.js 24 y npm
+- Solo para la ejecución manual: Python 3.13 o superior y Node.js 24 con npm
 
-## Puesta en marcha
+## Ejecutar con Docker
 
-Todos los comandos parten de la raíz del repositorio. Se necesitan tres terminales (base de datos, backend y frontend).
+Levanta backend, frontend y (opcionalmente) PostgreSQL con un solo comando. Desde la raíz del repositorio:
+
+```bash
+cp .env.example .env        # en PowerShell: Copy-Item .env.example .env
+```
+
+Edite `.env` y reemplace `<contraseña>` y `<host-aurora>` por los datos de la base de Bluecore. Luego:
+
+```bash
+docker compose up --build
+```
+
+| Qué | URL |
+|---|---|
+| Aplicación | http://localhost:4200 |
+| Documentación de la API (Swagger UI) | http://localhost:8000/docs |
+| Estado de la API y de la base de datos | http://localhost:8000/health |
+
+Para detener todo: `docker compose down` (añada `-v` para borrar también los datos de la base local). El backend aplica las migraciones (`alembic upgrade head`) en cada arranque.
+
+Para usar la base local en lugar de Aurora, vea [Base de datos](#base-de-datos).
+
+## Puesta en marcha manual
+
+Alternativa sin contenedores para backend y frontend. Todos los comandos parten de la raíz del repositorio. Se necesitan tres terminales (base de datos, backend y frontend); la base de datos puede ser la local en Docker o la Aurora de Bluecore.
 
 ### 1. Base de datos
 
 ```bash
-docker compose up -d db
+docker compose --profile local-db up -d db
 ```
 
-Levanta PostgreSQL 16 en `localhost:5432` y crea automáticamente el rol `usuario_a` y el esquema `esquema_a`. Espere a que el contenedor esté `healthy` (`docker compose ps`).
+Levanta PostgreSQL 16 en `localhost:5432` y crea automáticamente el rol `usuario_a` y el esquema `esquema_a`. Espere a que el contenedor esté `healthy` (`docker compose ps`). Si usa la Aurora de Bluecore, omita este paso.
 
 ### 2. Backend
 
@@ -58,6 +81,8 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
+`backend/.env` debe completarse antes de arrancar: `DATABASE_URL` es obligatoria y no tiene valor por defecto (en `.env.example` está la línea de Aurora activa y la local, con `localhost`, comentada).
+
 Si PowerShell bloquea la activación del entorno virtual, ejecute antes `Set-ExecutionPolicy -Scope Process RemoteSigned`.
 
 ### 3. Frontend
@@ -76,21 +101,25 @@ npx ng serve
 | Documentación interactiva de la API (Swagger UI) | http://localhost:8000/docs |
 | Estado de la API y de la base de datos | http://localhost:8000/health |
 
-En desarrollo, Angular redirige `/api` y `/health` al backend (`frontend/proxy.conf.json`), por lo que los ejemplos `curl` también funcionan contra `http://localhost:4200`.
+Con Docker, Nginx reenvía `/api` y `/health` al backend (`frontend/nginx.conf`). En desarrollo, Angular redirige `/api` y `/health` al backend (`frontend/proxy.conf.json`), por lo que los ejemplos `curl` también funcionan contra `http://localhost:4200`.
 
 ## Base de datos
 
 - **PostgreSQL y no MySQL:** el host MySQL indicado en el enunciado no resuelve en DNS. Bluecore dispone de un cluster Aurora PostgreSQL 16 (base `demo`) donde al usuario `usuario_a` le corresponde el esquema `esquema_a`, el único en el que puede crear objetos.
 - **Solo `esquema_a`:** la aplicación fija `search_path = esquema_a` en la conexión (`DB_SCHEMA`); no lee ni modifica ningún otro esquema. Las tablas y migraciones no llevan el nombre del esquema escrito.
-- **Docker local:** `docker-compose.yml` reproduce el mismo entorno (PostgreSQL 16, base `demo`, rol `usuario_a` sin privilegios de administrador, esquema `esquema_a`), con el script `docker/postgres/init/01-esquema-a.sql`.
-- **Apuntar a la Aurora de Bluecore:** editar `DATABASE_URL` en `backend/.env` y volver a ejecutar `alembic upgrade head`:
+- **Dos bases posibles,** elegidas con `DATABASE_URL` (obligatoria, sin valor por defecto, para no conectarse por error a una base no prevista):
 
-```env
-DATABASE_URL=postgresql+psycopg://usuario_a:<contraseña>@<host-aurora>:5432/demo
-DB_SCHEMA=esquema_a
-```
+| Opción | Cuándo | `DATABASE_URL` |
+|---|---|---|
+| Aurora PostgreSQL de Bluecore (por defecto) | Pruebas reales | `postgresql+psycopg://usuario_a:<contraseña>@<host-aurora>:5432/demo?sslmode=require` |
+| PostgreSQL local en Docker | Pruebas locales | `postgresql+psycopg://usuario_a:usuario_a@db:5432/demo` (desde contenedores) o `...@localhost:5432/demo` (backend sin Docker) |
 
-Variables de `backend/.env` (valores por defecto en `.env.example`): `DATABASE_URL`, `DB_SCHEMA`, `CORS_ORIGINS`. El archivo `.env` está en `.gitignore`; nunca se suben credenciales.
+- **Cambiar de base:** editar `DATABASE_URL` en `.env` (raíz, para Docker) o en `backend/.env` (backend sin Docker). Para la local con Docker, comente la línea de Aurora, descomente la línea `@db` y ejecute `docker compose --profile local-db up --build`. El servicio `db` solo existe con el perfil `local-db`; sin él, `docker compose up` usa la base indicada en `DATABASE_URL`.
+- **Cifrado:** `sslmode=require` cifra con TLS la conexión hacia AWS.
+- **Base local:** `docker-compose.yml` reproduce el entorno de Bluecore (PostgreSQL 16, base `demo`, rol `usuario_a` sin privilegios de administrador, esquema `esquema_a`) con el script `docker/postgres/init/01-esquema-a.sql`.
+- **Migraciones:** con Docker se aplican solas al arrancar el backend; en ejecución manual, `alembic upgrade head`.
+
+Variables (valores de ejemplo en `.env.example` y `backend/.env.example`): `DATABASE_URL`, `DB_SCHEMA` y, solo en el backend, `CORS_ORIGINS`. Los archivos `.env` están en `.gitignore`; nunca se suben credenciales.
 
 ## Tests y calidad
 
@@ -307,7 +336,8 @@ Todos los errores (incluidas rutas inexistentes, métodos no permitidos y fallos
 
 ```
 .
-├── docker-compose.yml          PostgreSQL 16 para desarrollo
+├── docker-compose.yml          Backend, frontend y PostgreSQL local (perfil local-db)
+├── .env.example                Variables para Docker (copiar a .env)
 ├── docker/postgres/init/       Crea el rol usuario_a y el esquema esquema_a
 ├── backend/
 │   ├── app/
@@ -321,9 +351,12 @@ Todos los errores (incluidas rutas inexistentes, métodos no permitidos y fallos
 │   │   └── core/               Configuración, sesión de BD, errores
 │   ├── alembic/                Migraciones
 │   ├── tests/
+│   ├── Dockerfile
 │   ├── requirements.txt / requirements-dev.txt
 │   └── .env.example
 ├── frontend/
+│   ├── Dockerfile              Compilación de Angular + Nginx
+│   ├── nginx.conf              Sirve la SPA y reenvía /api y /health al backend
 │   ├── proxy.conf.json         Proxy de desarrollo hacia el backend
 │   └── src/app/
 │       ├── core/               Servicio de API, interceptor de errores, modelos
@@ -334,5 +367,4 @@ Todos los errores (incluidas rutas inexistentes, métodos no permitidos y fallos
 
 ## Pendiente / próximos pasos
 
-- Dockerizar backend y frontend para levantar todo con un solo `docker compose up` (bonus).
 - Autenticación con JWT (bonus).
