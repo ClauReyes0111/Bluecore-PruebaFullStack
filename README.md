@@ -9,7 +9,7 @@ Aplicación full stack para gestionar solicitudes de crédito: crear solicitudes
 | API | FastAPI + Uvicorn | 0.143.2 / 0.54.0 |
 | Datos | SQLAlchemy + Alembic + psycopg 3 | 2.1.4 / 1.20.0 / 3.3.6 |
 | Configuración | pydantic-settings | 2.16.0 |
-| Base de datos | PostgreSQL (Aurora de Bluecore o Docker local) | 16 |
+| Base de datos | PostgreSQL (Docker local por defecto; Aurora de Bluecore opcional) | 16 |
 | Frontend | Angular (standalone, Reactive Forms) | 22.2 |
 | Tests | pytest + httpx / Vitest (runner de Angular) | 9.1.1 + 2.13.1 / 5.0 |
 | Calidad | Ruff | 0.17.1 |
@@ -21,17 +21,14 @@ Aplicación full stack para gestionar solicitudes de crédito: crear solicitudes
 
 ## Ejecutar con Docker
 
-Levanta backend, frontend y (opcionalmente) PostgreSQL con un solo comando. Desde la raíz del repositorio:
+Levanta PostgreSQL local, backend y frontend con un solo comando. Desde la raíz del repositorio:
 
 ```bash
 cp .env.example .env        # en PowerShell: Copy-Item .env.example .env
-```
-
-Edite `.env` y reemplace `<contraseña>` y `<host-aurora>` por los datos de la base de Bluecore. Luego:
-
-```bash
 docker compose up --build
 ```
+
+**No hace falta editar nada:** el `.env` de ejemplo ya apunta a la base PostgreSQL local en Docker (`COMPOSE_PROFILES=local-db` levanta también el contenedor `db`).
 
 | Qué | URL |
 |---|---|
@@ -41,19 +38,45 @@ docker compose up --build
 
 Para detener todo: `docker compose down` (añada `-v` para borrar también los datos de la base local). El backend aplica las migraciones (`alembic upgrade head`) en cada arranque.
 
-Para usar la base local en lugar de Aurora, vea [Base de datos](#base-de-datos).
+Para probar contra la Aurora de Bluecore, vea [Pruebas con la Aurora de Bluecore (paso manual)](#pruebas-con-la-aurora-de-bluecore-paso-manual).
+
+## Pruebas con la Aurora de Bluecore (paso manual)
+
+Las credenciales de Aurora **no están en el repositorio a propósito**: es público y nunca se suben contraseñas. Por eso este paso es manual y lo hace usted con su contraseña:
+
+1. Edite `.env` (raíz, para Docker) y, si ejecuta el backend sin Docker, también `backend/.env`.
+2. Comente las líneas locales (`COMPOSE_PROFILES` y la `DATABASE_URL` con `@db`; en `backend/.env`, la de `@localhost`) y descomente la línea de Aurora, escribiendo a mano la contraseña y el host:
+
+   ```
+   DATABASE_URL=postgresql+psycopg://usuario_a:<contraseña>@<host-aurora>:5432/demo?sslmode=require
+   ```
+
+3. Reinicie:
+
+   ```bash
+   docker compose down
+   docker compose up --build
+   ```
+
+Notas:
+
+- `sslmode=require` cifra la conexión con TLS; es necesario con Aurora.
+- Solo se usa el esquema `esquema_a`; la migración (`alembic upgrade head`) se aplica sola al arrancar el backend.
+- Si la contraseña contiene `@`, `:`, `/` o `#`, codifíquela en la URL (por ejemplo `@` se escribe `%40`).
+- `.env` y `backend/.env` están en `.gitignore`: no se suben al repositorio.
 
 ## Puesta en marcha manual
 
-Alternativa sin contenedores para backend y frontend. Todos los comandos parten de la raíz del repositorio. Se necesitan tres terminales (base de datos, backend y frontend); la base de datos puede ser la local en Docker o la Aurora de Bluecore.
+Alternativa sin contenedores para backend y frontend. Todos los comandos parten de la raíz del repositorio. Se necesitan tres terminales (base de datos, backend y frontend); la base de datos es la local en Docker (por defecto) o, como paso manual, la Aurora de Bluecore.
 
 ### 1. Base de datos
 
 ```bash
-docker compose --profile local-db up -d db
+cp .env.example .env        # en PowerShell: Copy-Item .env.example .env
+docker compose up -d db
 ```
 
-Levanta PostgreSQL 16 en `localhost:5432` y crea automáticamente el rol `usuario_a` y el esquema `esquema_a`. Espere a que el contenedor esté `healthy` (`docker compose ps`). Si usa la Aurora de Bluecore, omita este paso.
+El `.env` de la raíz activa el perfil `local-db` mediante `COMPOSE_PROFILES`, así que `docker compose up -d db` levanta PostgreSQL 16 en `localhost:5432` y crea automáticamente el rol `usuario_a` y el esquema `esquema_a`. Espere a que el contenedor esté `healthy` (`docker compose ps`). Si usa la Aurora de Bluecore, omita este paso.
 
 ### 2. Backend
 
@@ -81,7 +104,7 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-`backend/.env` debe completarse antes de arrancar: `DATABASE_URL` es obligatoria y no tiene valor por defecto (en `.env.example` está la línea de Aurora activa y la local, con `localhost`, comentada).
+`backend/.env.example` funciona tal cual con la base local del paso 1 (`DATABASE_URL` apunta a `localhost`). `DATABASE_URL` es obligatoria y no tiene valor por defecto; para Aurora vea [Pruebas con la Aurora de Bluecore (paso manual)](#pruebas-con-la-aurora-de-bluecore-paso-manual).
 
 Si PowerShell bloquea la activación del entorno virtual, ejecute antes `Set-ExecutionPolicy -Scope Process RemoteSigned`.
 
@@ -111,10 +134,10 @@ Con Docker, Nginx reenvía `/api` y `/health` al backend (`frontend/nginx.conf`)
 
 | Opción | Cuándo | `DATABASE_URL` |
 |---|---|---|
-| Aurora PostgreSQL de Bluecore (por defecto) | Pruebas reales | `postgresql+psycopg://usuario_a:<contraseña>@<host-aurora>:5432/demo?sslmode=require` |
-| PostgreSQL local en Docker | Pruebas locales | `postgresql+psycopg://usuario_a:usuario_a@db:5432/demo` (desde contenedores) o `...@localhost:5432/demo` (backend sin Docker) |
+| PostgreSQL local en Docker (por defecto) | Pruebas locales, sin editar nada | `postgresql+psycopg://usuario_a:usuario_a@db:5432/demo` (`.env`, desde contenedores) o `...@localhost:5432/demo` (`backend/.env`, backend sin Docker) |
+| Aurora PostgreSQL de Bluecore (paso manual) | Pruebas reales | `postgresql+psycopg://usuario_a:<contraseña>@<host-aurora>:5432/demo?sslmode=require` (la contraseña la escribe usted; no está en el repositorio) |
 
-- **Cambiar de base:** editar `DATABASE_URL` en `.env` (raíz, para Docker) o en `backend/.env` (backend sin Docker). Para la local con Docker, comente la línea de Aurora, descomente la línea `@db` y ejecute `docker compose --profile local-db up --build`. El servicio `db` solo existe con el perfil `local-db`; sin él, `docker compose up` usa la base indicada en `DATABASE_URL`.
+- **Cambiar de base:** editar `DATABASE_URL` en `.env` (raíz, para Docker) o en `backend/.env` (backend sin Docker). Por defecto está activa la local (`COMPOSE_PROFILES=local-db` y la `DATABASE_URL` con `@db`). Para Aurora, comente esas dos líneas, descomente la `DATABASE_URL` de Aurora, complete la contraseña y ejecute `docker compose down` y `docker compose up --build` (detalle en [Pruebas con la Aurora de Bluecore](#pruebas-con-la-aurora-de-bluecore-paso-manual)). El servicio `db` solo existe con el perfil `local-db`; sin él, `docker compose up` usa la base indicada en `DATABASE_URL`.
 - **Cifrado:** `sslmode=require` cifra con TLS la conexión hacia AWS.
 - **Base local:** `docker-compose.yml` reproduce el entorno de Bluecore (PostgreSQL 16, base `demo`, rol `usuario_a` sin privilegios de administrador, esquema `esquema_a`) con el script `docker/postgres/init/01-esquema-a.sql`.
 - **Migraciones:** con Docker se aplican solas al arrancar el backend; en ejecución manual, `alembic upgrade head`.
