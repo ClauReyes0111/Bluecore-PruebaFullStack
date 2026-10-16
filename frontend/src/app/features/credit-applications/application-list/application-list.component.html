@@ -1,0 +1,82 @@
+<div class="header">
+  <h1>Solicitudes de crédito</h1>
+  <a routerLink="/solicitudes/nueva" class="btn btn--primary">+ Nueva solicitud</a>
+</div>
+
+@if (message(); as text) {
+  <div class="alert alert--success" role="status">{{ text }}</div>
+}
+
+<div class="filters" role="group" aria-label="Filtrar por estado">
+  @for (filter of filters; track filter.label) {
+    <button
+      type="button"
+      class="btn btn--secondary"
+      [attr.aria-pressed]="status() === filter.value"
+      (click)="setFilter(filter.value)"
+    >
+      {{ filter.label }}
+    </button>
+  }
+</div>
+
+@if (loadError(); as detail) {
+  <div class="alert alert--error" role="alert">
+    {{ detail }}
+    <button type="button" class="btn btn--secondary" (click)="load()">Reintentar</button>
+  </div>
+} @else if (loading() && !page()) {
+  <p role="status">Cargando solicitudes...</p>
+} @else if (page(); as current) {
+  @if (current.items.length === 0) {
+    <p class="empty">No hay solicitudes para este filtro.</p>
+  } @else {
+    <div class="table-wrapper" [attr.aria-busy]="loading()">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Fecha</th>
+            <th scope="col">Cédula</th>
+            <th scope="col" class="num">Monto</th>
+            <th scope="col" class="num">Plazo</th>
+            <th scope="col">Estado</th>
+            <th scope="col">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of current.items; track item.id) {
+            <tr>
+              <td>{{ item.created_at | date: 'dd/MM/yyyy' }}</td>
+              <td>{{ item.applicant_document }}</td>
+              <td class="num">{{ item.amount | currency: 'USD' }}</td>
+              <td class="num">{{ item.term_months }} meses</td>
+              <td><app-status-badge [status]="item.status" /></td>
+              <td class="row-actions">
+                @if (item.status === 'PENDING') {
+                  <button type="button" class="btn btn--secondary" (click)="openDecision(item, 'APPROVED')">Aprobar</button>
+                  <button type="button" class="btn btn--secondary" (click)="openDecision(item, 'REJECTED')">Rechazar</button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="pagination" aria-label="Paginación">
+      <button type="button" class="btn btn--secondary" [disabled]="!hasPrevious()" (click)="goTo(offset() - 20)">‹ Anterior</button>
+      <span>{{ rangeStart() }}–{{ rangeEnd() }} de {{ current.total }}</span>
+      <button type="button" class="btn btn--secondary" [disabled]="!hasNext()" (click)="goTo(offset() + 20)">Siguiente ›</button>
+    </nav>
+  }
+}
+
+@if (deciding(); as pending) {
+  <app-decision-dialog
+    [application]="pending.application"
+    [decision]="pending.decision"
+    (decided)="onDecided(pending.decision)"
+    (conflict)="load()"
+    (cancelled)="closeDialog()"
+  />
+}
