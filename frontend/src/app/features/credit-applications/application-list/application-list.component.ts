@@ -82,6 +82,12 @@ export class ApplicationListComponent implements OnInit {
     this.loadError.set(null);
     this.request = this.api.list(this.status(), PAGE_SIZE, this.offset()).subscribe({
       next: (page) => {
+        // Si al decidir el último elemento la página queda vacía, se vuelve a la última válida
+        if (page.items.length === 0 && this.offset() > 0 && page.total > 0) {
+          this.offset.set(Math.floor((page.total - 1) / PAGE_SIZE) * PAGE_SIZE);
+          this.load();
+          return;
+        }
         this.page.set(page);
         this.loading.set(false);
       },

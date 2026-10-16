@@ -80,6 +80,36 @@ describe('ApplicationListComponent', () => {
     expect(root.textContent).toContain('No hay solicitudes para este filtro.');
   });
 
+  it('vuelve a la última página válida cuando la actual queda vacía', async () => {
+    const firstPage: CreditApplicationPage = {
+      items: [application('1', 'PENDING')],
+      total: 21,
+      limit: 20,
+      offset: 0,
+    };
+    await setup(firstPage);
+    const emptyLastPage: CreditApplicationPage = { items: [], total: 20, limit: 20, offset: 20 };
+    const lastValidPage: CreditApplicationPage = {
+      items: [application('7', 'PENDING'), application('8', 'PENDING')],
+      total: 20,
+      limit: 20,
+      offset: 0,
+    };
+    api.list.mockReturnValueOnce(of(emptyLastPage)).mockReturnValueOnce(of(lastValidPage));
+
+    const next = Array.from(root.querySelectorAll('button')).find((b) =>
+      b.textContent!.includes('Siguiente'),
+    )!;
+    next.click();
+    fixture.detectChanges();
+
+    expect(api.list).toHaveBeenNthCalledWith(2, null, 20, 20);
+    expect(api.list).toHaveBeenNthCalledWith(3, null, 20, 0);
+    expect(root.querySelectorAll('tbody tr').length).toBe(2);
+    expect(root.textContent).not.toContain('No hay solicitudes para este filtro.');
+    expect(root.querySelector('nav.pagination')).not.toBeNull();
+  });
+
   it('muestra la notificación pendiente y la limpia', async () => {
     await setup(page, 'Solicitud creada correctamente.');
     expect(root.textContent).toContain('Solicitud creada correctamente.');
