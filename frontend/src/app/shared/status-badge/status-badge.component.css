@@ -1,0 +1,11 @@
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge--pending { background: var(--color-pending-bg); color: var(--color-pending); }
+.badge--approved { background: var(--color-approved-bg); color: var(--color-approved); }
+.badge--rejected { background: var(--color-rejected-bg); color: var(--color-rejected); }
