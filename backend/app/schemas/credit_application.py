@@ -42,8 +42,7 @@ class CreditApplicationCreate(BaseModel):
     @field_validator("amount", mode="after")
     @classmethod
     def validate_amount(cls, value: Decimal) -> Decimal:
-        # Los decimales se revisan primero: 100.555 también está fuera de rango y debe
-        # reportar el error de decimales (así lo exige el test)
+        # Primero el formato (decimales) y después el rango: así se corrige un error a la vez
         # Pydantic ya rechaza NaN e Infinity para Decimal, por lo que aquí el valor es finito
         if value != value.quantize(_CENTS):
             raise PydanticCustomError("amount_decimals", "El monto admite como máximo 2 decimales.")

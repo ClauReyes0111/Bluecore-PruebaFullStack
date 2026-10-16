@@ -19,7 +19,7 @@ def db_session() -> Iterator[Session]:
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
     Base.metadata.create_all(engine)
-    session = sessionmaker(bind=engine)()
+    session = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)()
     try:
         yield session
     finally:
