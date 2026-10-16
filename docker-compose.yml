@@ -1,6 +1,7 @@
 services:
   db:
-    # Solo se levanta con: docker compose --profile local-db up
+    # Se levanta con el perfil local-db, que el .env por defecto activa mediante
+    # COMPOSE_PROFILES; con Aurora se comenta esa variable y el servicio no arranca
     profiles: ["local-db"]
     # Misma versión mayor que la Aurora PostgreSQL de Bluecore (16)
     image: postgres:16
