@@ -1,3 +1,9 @@
+import os
+
+# Los tests usan SQLite en memoria y no deben depender de un .env.
+# Debe fijarse antes de importar cualquier módulo de app (Settings exige DATABASE_URL).
+os.environ.setdefault("DATABASE_URL", "sqlite://")
+
 from collections.abc import Iterator
 
 import pytest
