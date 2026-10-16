@@ -146,8 +146,8 @@ content-type: application/json
   "status": "PENDING",
   "decision_comment": null,
   "decided_at": null,
-  "created_at": "2026-10-15T14:32:10.512340Z",
-  "updated_at": "2026-10-15T14:32:10.512340Z"
+  "created_at": "2026-10-15T14:32:10Z",
+  "updated_at": "2026-10-15T14:32:10Z"
 }
 ```
 
@@ -179,9 +179,9 @@ curl -X PATCH http://localhost:8000/api/v1/credit-applications/3f1c7a52-9d0e-4b8
   "term_months": 36,
   "status": "APPROVED",
   "decision_comment": "Cumple con la política de crédito",
-  "decided_at": "2026-10-15T14:35:02.101200Z",
-  "created_at": "2026-10-15T14:32:10.512340Z",
-  "updated_at": "2026-10-15T14:35:02.101200Z"
+  "decided_at": "2026-10-15T14:35:02Z",
+  "created_at": "2026-10-15T14:32:10Z",
+  "updated_at": "2026-10-15T14:35:02Z"
 }
 ```
 
