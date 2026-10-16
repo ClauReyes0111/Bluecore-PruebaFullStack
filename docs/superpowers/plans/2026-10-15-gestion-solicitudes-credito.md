@@ -4,9 +4,12 @@
 
 **Goal:** API FastAPI + frontend Angular para crear, listar (filtro por estado, paginado) y aprobar/rechazar solicitudes de crédito, con validaciones de negocio, errores RFC 9457 en español, tests y README.
 
-**Architecture:** Backend en capas (`api` → `services` → `repositories` → `models`, con `domain` puro y `core` transversal) sobre MySQL 8 en Docker, esquema versionado con Alembic. Frontend Angular standalone con un servicio de API, un interceptor que normaliza errores y tres piezas de UI (listado, formulario, diálogo de decisión).
+**Architecture:** Backend en capas (`api` → `services` → `repositories` → `models`, con `domain` puro y `core` transversal) sobre PostgreSQL 16 (`esquema_a`; Aurora de Bluecore o Docker en desarrollo), esquema versionado con Alembic. Frontend Angular standalone con un servicio de API, un interceptor que normaliza errores y tres piezas de UI (listado, formulario, diálogo de decisión).
 
-**Tech Stack:** Python ≥ 3.13, FastAPI, Pydantic v2, pydantic-settings, SQLAlchemy 2.0, PyMySQL, Alembic, pytest, httpx, Ruff · Angular (estable actual) · MySQL 8.4 (Docker).
+**Tech Stack:** Python ≥ 3.13, FastAPI, Pydantic v2, pydantic-settings, SQLAlchemy 2.0, psycopg 3, Alembic, pytest, httpx2, Ruff · Angular (estable actual) · PostgreSQL 16.
+
+> **Cambio del 2026-10-15:** las Tasks 1–4 se ejecutaron con MySQL; la **Task 4b** migra todo a PostgreSQL
+> con `esquema_a`. Desde la Task 5, donde el plan diga MySQL léase PostgreSQL.
 
 **Spec:** `docs/superpowers/specs/2026-10-15-gestion-solicitudes-credito-design.md`
 
@@ -216,6 +219,26 @@ def test_normalize_document(raw, expected): assert normalize_document(raw) == ex
 - [ ] **Step 6: Verificar contra MySQL.** Con `docker compose up -d db` y `.env` copiado de `.env.example`: `alembic upgrade head`, luego `docker compose exec db mysql -ubluecore -pbluecore bluecore -e "SHOW CREATE TABLE credit_applications\G"` → Expected: tabla con los 3 `CHECK` y 2 índices. `alembic downgrade base` y `alembic upgrade head` sin errores.
 - [ ] **Step 7: Commit** — `feat(backend): agregar modelo de solicitud de crédito y migración inicial`
 
+### Task 4b: Migrar a PostgreSQL con `esquema_a`
+
+**Files:**
+- Modify: `docker-compose.yml`, `.gitignore`, `backend/requirements.txt`, `backend/.env.example`, `backend/app/core/config.py`, `backend/app/core/database.py`, `backend/alembic/env.py`
+- Create: `docker/postgres/init/01-esquema-a.sql`
+- Test: `backend/tests/core/test_database.py`
+
+**Interfaces:**
+- Produces:
+  - `Settings.database_url` (default `postgresql+psycopg://usuario_a:usuario_a@localhost:5432/demo`) y `Settings.db_schema: str = "esquema_a"`.
+  - `build_engine(url: str, schema: str) -> Engine` en `app/core/database.py`: en PostgreSQL fija `search_path` al esquema mediante `connect_args={"options": f"-csearch_path={schema}"}`; en otros motores (SQLite de los tests) no agrega nada. Lo usan la app y Alembic.
+  - Alembic guarda su tabla `alembic_version` en `esquema_a` (`version_table_schema`).
+  - Docker: `postgres:16`, base `demo`, administrador `postgres`, rol `usuario_a` / `usuario_a` sin privilegios de superusuario, esquema `esquema_a` con dueño `usuario_a` (reproduce los permisos de Aurora).
+
+- [ ] **Step 1: Test que falla:** `build_engine("postgresql+psycopg://u:p@localhost/db", "esquema_a")` no abre conexión y su dialecto es `postgresql`; `build_engine("sqlite://", "esquema_a")` funciona y ejecuta `SELECT 1`. Verificar `connect_args` revisando que `engine.dialect.create_connect_args(engine.url)` incluya `options="-csearch_path=esquema_a"`.
+- [ ] **Step 2:** Implementar; cambiar `pymysql`/`cryptography` por `psycopg[binary]`; docker-compose e init SQL; `.env.example`; `env.py`; agregar `db.txt` al `.gitignore`.
+- [ ] **Step 3: Verificar en Docker:** `docker compose down -v` (borra el MySQL de desarrollo), `docker compose up -d db`, `alembic upgrade head`, y `\d esquema_a.credit_applications` con `psql` → tabla con 3 `CHECK` y 2 índices en `esquema_a`; `alembic_version` en `esquema_a`.
+- [ ] **Step 4: Verificar en Aurora de Bluecore** con `DATABASE_URL` real en `.env` (no versionado): `alembic upgrade head` crea la tabla en `esquema_a` y nada fuera de ese esquema.
+- [ ] **Step 5: Commit** — `refactor: cambiar MySQL por PostgreSQL usando el esquema esquema_a`
+
 ### Task 5: Esquemas Pydantic con mensajes en español
 
 **Files:**
@@ -344,7 +367,7 @@ Traducción de errores de validación a `errors[]`:
 - [ ] **Step 2: Ejecutar y ver que fallan.** → FAIL.
 - [ ] **Step 3: Implementar** el router; una dependencia `get_service(db = Depends(get_db)) -> CreditApplicationService`. Los endpoints no construyen errores: solo llaman al servicio.
 - [ ] **Step 4: Ejecutar.** Run: `pytest -v && ruff check . && ruff format --check .` → PASS.
-- [ ] **Step 5: Prueba manual contra MySQL.** `alembic upgrade head`, `uvicorn app.main:app --reload`; en `http://localhost:8000/docs` crear una solicitud, listarla, aprobarla y volver a aprobarla (409). Expected: mismas respuestas que los tests; la fila existe en MySQL.
+- [ ] **Step 5: Prueba manual contra PostgreSQL.** `alembic upgrade head`, `uvicorn app.main:app --reload`; en `http://localhost:8000/docs` crear una solicitud, listarla, aprobarla y volver a aprobarla (409). Expected: mismas respuestas que los tests; la fila existe en `esquema_a`.
 - [ ] **Step 6: Commit** — `feat(backend): exponer endpoints REST de solicitudes de crédito`
 
 ---
@@ -426,7 +449,7 @@ Todos los comandos desde `frontend/` con Node 24 (`nvm use 24.19.0`; si nvm pide
 - [ ] **Step 2:** Ejecutar → FAIL.
 - [ ] **Step 3:** Implementar diálogo y listado.
 - [ ] **Step 4:** `npx ng test --watch=false` → PASS; `npx ng build` sin errores.
-- [ ] **Step 5: Prueba manual de punta a punta** con backend + MySQL corriendo: crear 3 solicitudes, filtrar por cada estado, aprobar una, rechazar otra, intentar decidir una ya decidida desde otra pestaña (409 visible), enviar monto 499 desde el formulario y ver el mensaje, detener el backend y ver "No se pudo conectar con el servidor."
+- [ ] **Step 5: Prueba manual de punta a punta** con backend + PostgreSQL corriendo: crear 3 solicitudes, filtrar por cada estado, aprobar una, rechazar otra, intentar decidir una ya decidida desde otra pestaña (409 visible), enviar monto 499 desde el formulario y ver el mensaje, detener el backend y ver "No se pudo conectar con el servidor."
 - [ ] **Step 6: Commit** — dos commits: `feat(frontend): agregar diálogo de aprobación y rechazo` y `feat(frontend): agregar listado de solicitudes con filtros y paginación`.
 
 ---
@@ -438,6 +461,6 @@ Todos los comandos desde `frontend/` con Node 24 (`nvm use 24.19.0`; si nvm pide
 **Files:**
 - Modify: `README.md`
 
-- [ ] **Step 1: Escribir el README** en español: descripción; stack con versiones reales; requisitos (Docker Desktop, Python ≥ 3.13, Node 24); pasos numerados (1. `docker compose up -d db`; 2. backend: venv, `pip install -r requirements-dev.txt`, copiar `.env.example` a `.env`, `alembic upgrade head`, `uvicorn app.main:app --reload`; 3. frontend: `npm install`, `npx ng serve`, abrir `http://localhost:4200`); cómo correr tests y linter de ambos lados; tabla de endpoints con ejemplos `curl` (crear, listar filtrado, aprobar, error 422 y 409); formato de errores; sección **"Decisiones de diseño"** con las justificaciones de la spec §4–§8; nota sobre el host MySQL del enunciado que no resuelve y cómo apuntar a otro servidor cambiando `DATABASE_URL`; estructura de carpetas.
+- [ ] **Step 1: Escribir el README** en español: descripción; stack con versiones reales; requisitos (Docker Desktop, Python ≥ 3.13, Node 24); pasos numerados (1. `docker compose up -d db`; 2. backend: venv, `pip install -r requirements-dev.txt`, copiar `.env.example` a `.env`, `alembic upgrade head`, `uvicorn app.main:app --reload`; 3. frontend: `npm install`, `npx ng serve`, abrir `http://localhost:4200`); cómo correr tests y linter de ambos lados; tabla de endpoints con ejemplos `curl` (crear, listar filtrado, aprobar, error 422 y 409); formato de errores; sección **"Decisiones de diseño"** con las justificaciones de la spec §4–§8; nota sobre el host MySQL del enunciado que no resuelve, el uso de PostgreSQL con `esquema_a` y cómo apuntar a la Aurora de Bluecore cambiando `DATABASE_URL`; estructura de carpetas.
 - [ ] **Step 2: Verificación desde cero:** clonar el repo en una carpeta temporal, `docker compose down -v` en el original, y seguir el README **literalmente** sin pasos extra. Expected: tests de backend y frontend en verde, app funcionando en `http://localhost:4200`. Corregir el README ante cualquier paso faltante.
 - [ ] **Step 3: Commit** — `docs: documentar instalación, uso, API y decisiones de diseño`
