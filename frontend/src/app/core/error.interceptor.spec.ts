@@ -64,4 +64,29 @@ describe('errorInterceptor', () => {
     expect(error?.detail).toBe('Ocurrió un error inesperado.');
     expect(error?.fieldErrors).toEqual({});
   });
+
+  it('trata un 504 del proxy sin Problem Details como falta de conexión', () => {
+    let error: ApiError | undefined;
+    http.get('/x').subscribe({ error: (e: ApiError) => (error = e) });
+    controller
+      .expectOne('/x')
+      .flush('Gateway Timeout', { status: 504, statusText: 'Gateway Timeout' });
+
+    expect(error?.status).toBe(504);
+    expect(error?.title).toBe('Sin conexión');
+    expect(error?.detail).toBe('No se pudo conectar con el servidor.');
+  });
+
+  it('conserva el Problem Details de un 503 del backend', () => {
+    let error: ApiError | undefined;
+    http.get('/x').subscribe({ error: (e: ApiError) => (error = e) });
+    controller.expectOne('/x').flush(
+      { type: 'service_unavailable', title: 'Servicio no disponible', detail: 'Base de datos no disponible.' },
+      { status: 503, statusText: 'Service Unavailable' },
+    );
+
+    expect(error?.status).toBe(503);
+    expect(error?.type).toBe('service_unavailable');
+    expect(error?.detail).toBe('Base de datos no disponible.');
+  });
 });

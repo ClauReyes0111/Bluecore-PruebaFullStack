@@ -20,10 +20,15 @@ function isProblem(body: unknown): body is ProblemBody {
   );
 }
 
+// Con el proxy de desarrollo, un backend caído responde 502/503/504 sin Problem Details:
+// se trata igual que un error de red, conservando el estado real.
+const PROXY_FAILURE_STATUSES = [502, 503, 504];
+
 function toApiError(error: HttpErrorResponse): ApiError {
-  if (error.status === 0) {
+  const proxyFailure = PROXY_FAILURE_STATUSES.includes(error.status) && !isProblem(error.error);
+  if (error.status === 0 || proxyFailure) {
     return {
-      status: 0,
+      status: error.status,
       type: 'network_error',
       title: 'Sin conexión',
       detail: 'No se pudo conectar con el servidor.',
