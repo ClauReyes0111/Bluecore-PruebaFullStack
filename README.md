@@ -51,12 +51,14 @@ Las credenciales de Aurora **no están en el repositorio a propósito**: es púb
    DATABASE_URL=postgresql+psycopg://usuario_a:<contraseña>@<host-aurora>:5432/demo?sslmode=require
    ```
 
-3. Reinicie:
+3. Reinicie (el `--profile local-db` del primer comando también detiene la base local si estaba corriendo):
 
    ```bash
-   docker compose down
+   docker compose --profile local-db down
    docker compose up --build
    ```
+
+4. Verifique la conexión: `http://localhost:8000/health` debe responder `{"status":"ok","database":"ok"}`.
 
 Notas:
 
@@ -390,4 +392,6 @@ Todos los errores (incluidas rutas inexistentes, métodos no permitidos y fallos
 
 ## Pendiente / próximos pasos
 
+- **Integración con la estructura de clientes del core de Bluecore.** El usuario `usuario_a` solo tiene permisos sobre `esquema_a` (no puede leer `customer`, `catalog`, `loan` ni `product`), así que se replicarán en `esquema_a`, con la misma estructura que Aurora, las tablas `document_types`, `customers` y `natural_persons`, y la solicitud se relacionará con el cliente (`customer_id`). Se aplicará como migración de Alembic (`0002`) para que exista igual en la base local y en Aurora.
 - Autenticación con JWT (bonus).
+- Mejoras menores del diálogo de decisión: deshabilitar "Confirmar" tras un `409` y mostrar el error específico del comentario ante un `422`.
