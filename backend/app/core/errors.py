@@ -1,7 +1,6 @@
 """Todos los errores de la API salen como Problem Details (RFC 9457) con textos en español."""
 
 import logging
-from http import HTTPStatus
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -60,7 +59,9 @@ def _message(error: dict) -> str:
     if error_type in _CUSTOM_ERROR_TYPES:
         return error["msg"]
     if error_type == "enum":
-        return f"Valor no permitido. Valores aceptados: {ctx['expected']}."
+        # Pydantic arma la lista en inglés ("'A', 'B' or 'C'")
+        expected = ctx["expected"].replace(" or ", " o ")
+        return f"Valor no permitido. Valores aceptados: {expected}."
     if error_type == "greater_than_equal":
         return f"Debe ser mayor o igual a {ctx['ge']}."
     if error_type == "less_than_equal":
@@ -95,11 +96,7 @@ async def _http_exception_handler(request: Request, exc: StarletteHTTPException)
             "Método no permitido",
             "El método HTTP no está permitido en esta ruta.",
         )
-    try:
-        title = HTTPStatus(exc.status_code).phrase
-    except ValueError:
-        title = "Error"
-    return problem_response(exc.status_code, "http_error", title, str(exc.detail))
+    return problem_response(exc.status_code, "http_error", "Error en la solicitud", str(exc.detail))
 
 
 async def _not_found_handler(request: Request, exc: ApplicationNotFound) -> JSONResponse:

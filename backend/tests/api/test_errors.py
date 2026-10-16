@@ -1,7 +1,7 @@
 import uuid
 
 import pytest
-from fastapi import Query
+from fastapi import HTTPException, Query
 from fastapi.testclient import TestClient
 
 from app.domain.exceptions import ApplicationAlreadyDecided, ApplicationNotFound
@@ -20,6 +20,10 @@ def app_with_test_routes(app):
     @app.get("/test-items/{application_id}")
     def items(application_id: uuid.UUID, limit: int = Query(20, ge=1, le=100)) -> dict:
         return {}
+
+    @app.get("/test-forbidden")
+    def forbidden() -> dict:
+        raise HTTPException(403, "Prohibido")
 
     @app.get("/test-boom")
     def boom() -> dict:
@@ -194,3 +198,20 @@ def test_json_list_body_must_be_an_object(api):
     body = api.post("/test-validation", json=[1, 2]).json()
 
     assert body["errors"] == [{"field": "body", "message": "El cuerpo debe ser un objeto JSON."}]
+
+
+def test_generic_http_error_uses_spanish_title(api):
+    response = api.get("/test-forbidden")
+
+    assert_problem(response, 403, "http_error", "Error en la solicitud", "Prohibido")
+
+
+def test_enum_error_message_is_in_spanish(api):
+    body = api.get("/api/v1/credit-applications", params={"status": "pending"}).json()
+
+    assert body["errors"] == [
+        {
+            "field": "status",
+            "message": "Valor no permitido. Valores aceptados: 'PENDING', 'APPROVED' o 'REJECTED'.",
+        }
+    ]

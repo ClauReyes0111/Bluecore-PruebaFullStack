@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health
+from app.api import credit_applications, health
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 
@@ -21,6 +21,7 @@ def create_app() -> FastAPI:
     )
     register_exception_handlers(app)
     app.include_router(health.router)
+    app.include_router(credit_applications.router)
     return app
 
 
