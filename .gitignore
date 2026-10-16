@@ -15,3 +15,6 @@ dist/
 
 # Enunciado de la prueba (contiene credenciales)
 Prueba_Bluecore*
+
+# DDL de la base demo de Bluecore: estructura interna, no se publica
+db.txt
