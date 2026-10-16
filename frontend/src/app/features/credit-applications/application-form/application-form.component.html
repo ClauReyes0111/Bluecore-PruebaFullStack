@@ -1,0 +1,66 @@
+<section class="card form-card">
+  <h1>Nueva solicitud de crédito</h1>
+
+  @if (formError(); as message) {
+    <div class="alert alert--error" role="alert">{{ message }}</div>
+  }
+
+  <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <div class="field">
+      <label for="applicant_document">Cédula del solicitante</label>
+      <input
+        id="applicant_document"
+        type="text"
+        formControlName="applicant_document"
+        autocomplete="off"
+        [attr.aria-invalid]="errorMessage('applicant_document') ? 'true' : null"
+        [attr.aria-describedby]="errorMessage('applicant_document') ? 'applicant_document-hint applicant_document-error' : 'applicant_document-hint'"
+      />
+      <span class="field__hint" id="applicant_document-hint">Ejemplo: 8-430-70</span>
+      @if (errorMessage('applicant_document'); as message) {
+        <p class="field__error" id="applicant_document-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="amount">Monto solicitado</label>
+      <input
+        id="amount"
+        type="number"
+        inputmode="decimal"
+        step="0.01"
+        formControlName="amount"
+        [attr.aria-invalid]="errorMessage('amount') ? 'true' : null"
+        [attr.aria-describedby]="errorMessage('amount') ? 'amount-hint amount-error' : 'amount-hint'"
+      />
+      <span class="field__hint" id="amount-hint">En USD, entre 500.00 y 50,000.00</span>
+      @if (errorMessage('amount'); as message) {
+        <p class="field__error" id="amount-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="term_months">Plazo</label>
+      <input
+        id="term_months"
+        type="number"
+        inputmode="numeric"
+        step="1"
+        formControlName="term_months"
+        [attr.aria-invalid]="errorMessage('term_months') ? 'true' : null"
+        [attr.aria-describedby]="errorMessage('term_months') ? 'term_months-hint term_months-error' : 'term_months-hint'"
+      />
+      <span class="field__hint" id="term_months-hint">En meses, entre 6 y 60</span>
+      @if (errorMessage('term_months'); as message) {
+        <p class="field__error" id="term_months-error">{{ message }}</p>
+      }
+    </div>
+
+    <div class="actions">
+      <button type="submit" class="btn btn--primary" [disabled]="saving()">
+        {{ saving() ? 'Guardando...' : 'Crear solicitud' }}
+      </button>
+      <a routerLink="/solicitudes" class="btn btn--secondary">Volver al listado</a>
+    </div>
+  </form>
+</section>

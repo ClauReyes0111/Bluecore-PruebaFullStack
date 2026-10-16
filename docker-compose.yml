@@ -1,0 +1,48 @@
+services:
+  db:
+    # Se levanta con el perfil local-db, que el .env por defecto activa mediante
+    # COMPOSE_PROFILES; con Aurora se comenta esa variable y el servicio no arranca
+    profiles: ["local-db"]
+    # Misma versión mayor que la Aurora PostgreSQL de Bluecore (16)
+    image: postgres:16
+    environment:
+      # Credenciales solo para desarrollo local
+      POSTGRES_DB: demo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Crea el rol usuario_a y su esquema esquema_a, como en la base de Bluecore
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    # DATABASE_URL (y demás variables) se leen del .env de la raíz
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+        # db solo existe con el perfil local-db; con Aurora se omite esta dependencia
+        required: false
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "4200:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

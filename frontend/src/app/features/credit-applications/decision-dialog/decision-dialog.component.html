@@ -1,0 +1,43 @@
+<dialog #dialog class="decision-dialog" aria-labelledby="decision-title" (cancel)="onNativeCancel($event)">
+  <h2 id="decision-title">{{ isApproval() ? 'Aprobar solicitud' : 'Rechazar solicitud' }}</h2>
+
+  <p class="summary">
+    Cédula <strong>{{ application().applicant_document }}</strong> ·
+    Monto <strong>{{ application().amount | currency: 'USD' }}</strong>
+  </p>
+
+  @if (serverError(); as message) {
+    <div class="alert alert--error" role="alert">{{ message }}</div>
+  }
+
+  <div class="field">
+    <label for="decision-comment">Comentario</label>
+    <textarea
+      id="decision-comment"
+      rows="4"
+      [value]="comment()"
+      (input)="onComment($event)"
+      [attr.aria-invalid]="touched() && !commentValid() ? 'true' : null"
+      [attr.aria-describedby]="touched() && !commentValid() ? 'decision-counter decision-error' : 'decision-counter'"
+    ></textarea>
+    <span class="field__hint" id="decision-counter">{{ trimmedLength() }} / {{ maxLength }}</span>
+    @if (touched() && !commentValid()) {
+      <p class="field__error" id="decision-error">El comentario debe tener entre 5 y 500 caracteres.</p>
+    }
+  </div>
+
+  <div class="actions">
+    <button type="button" class="btn btn--secondary" [disabled]="saving()" (click)="cancel()">Cancelar</button>
+    <button
+      type="button"
+      data-testid="confirm"
+      class="btn"
+      [class.btn--primary]="isApproval()"
+      [class.btn--danger]="!isApproval()"
+      [disabled]="saving() || !commentValid()"
+      (click)="submit()"
+    >
+      {{ isApproval() ? 'Confirmar aprobación' : 'Confirmar rechazo' }}
+    </button>
+  </div>
+</dialog>

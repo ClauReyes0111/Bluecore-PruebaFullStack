@@ -1,0 +1,19 @@
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# conftest fija DATABASE_URL antes de importar app, por lo que los imports van después
+"tests/conftest.py" = ["E402"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI usa Depends()/Query() como valores por defecto de los parámetros
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

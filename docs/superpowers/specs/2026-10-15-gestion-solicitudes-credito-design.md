@@ -33,7 +33,7 @@ de seguimiento.
 |---|---|---|
 | Backend | Python 3.13 + FastAPI | Contrato de API declarado y tipado (Pydantic), documentación OpenAPI automática, ligero para un dominio pequeño |
 | ORM y migraciones | SQLAlchemy 2.0 + Alembic | Esquema versionado como en producción |
-| Base de datos | MySQL 8 (en Docker durante el desarrollo) | La que pide el enunciado |
+| Base de datos | PostgreSQL 16, esquema `esquema_a` (Aurora de Bluecore; PostgreSQL 16 en Docker para desarrollo) | El entorno asignado al candidato (ver 2.1) |
 | Frontend | Angular (versión estable actual, standalone components) | Bonus de la prueba; se adopta desde el inicio para no hacer trabajo doble |
 | Tests | pytest (backend), runner por defecto de Angular (frontend) | |
 | Estilo | Ruff (backend) | |
@@ -42,12 +42,19 @@ de seguimiento.
 esta prueba no necesita) y Flask (validación, documentación y manejo de errores habría que armarlos
 a mano).
 
-### Base de datos
+### 2.1 Base de datos
+
+> **Cambio del 2026-10-15:** se reemplaza MySQL por PostgreSQL (decisión del usuario).
 
 - El host MySQL indicado en el enunciado (`prueba.cluster-...rds.amazonaws.com`) **no resuelve en DNS**
-  (verificado el 2026-10-15). Se notificará a Bluecore.
-- Mientras tanto se usa **MySQL 8 en Docker**. Cambiar a otro servidor solo requiere editar `.env`.
-- El cluster PostgreSQL alternativo funciona, pero se descarta porque el enunciado pide MySQL.
+  (verificado el 2026-10-15).
+- Bluecore dispone de un cluster **Aurora PostgreSQL 16** (base `demo`) donde cada candidato tiene su propio
+  esquema. Al usuario `usuario_a` le corresponde **`esquema_a`**, el único donde puede crear objetos.
+- **Solo se trabaja con `esquema_a`**: la aplicación no lee ni modifica ningún otro esquema de esa base.
+- Desarrollo local y `docker-compose`: **PostgreSQL 16 en Docker**, que reproduce el entorno de Bluecore
+  (base `demo`, rol `usuario_a` sin privilegios de administrador, esquema `esquema_a`).
+- La conexión fija `search_path = esquema_a`, así que las tablas no llevan el esquema escrito en el código.
+  Apuntar a Aurora o a Docker es solo cambiar `DATABASE_URL` en `.env`.
 
 ## 3. Convenciones
 
@@ -119,15 +126,15 @@ Tabla única `credit_applications`:
 
 | Columna | Tipo | Notas |
 |---|---|---|
-| `id` | `CHAR(36)`, PK | UUID v4 generado por la aplicación; no expone volumen ni permite adivinar IDs |
+| `id` | `VARCHAR(36)`, PK | UUID v4 generado por la aplicación; no expone volumen ni permite adivinar IDs. Texto (y no el tipo `uuid` nativo) para que el mismo modelo funcione en los tests con SQLite |
 | `applicant_document` | `VARCHAR(20)`, NOT NULL | Cédula normalizada |
-| `amount` | `DECIMAL(10,2)`, NOT NULL | Nunca `float` para dinero |
+| `amount` | `NUMERIC(10,2)`, NOT NULL | Nunca `float` para dinero |
 | `term_months` | `SMALLINT`, NOT NULL | |
 | `status` | `VARCHAR(10)`, NOT NULL, default `PENDING` | |
 | `decision_comment` | `TEXT`, NULL | |
-| `decided_at` | `DATETIME`, NULL | UTC |
-| `created_at` | `DATETIME`, NOT NULL | UTC |
-| `updated_at` | `DATETIME`, NOT NULL | UTC |
+| `decided_at` | `TIMESTAMP`, NULL | UTC |
+| `created_at` | `TIMESTAMP`, NOT NULL | UTC |
+| `updated_at` | `TIMESTAMP`, NOT NULL | UTC |
 
 - **Restricciones `CHECK`** en la base (defensa en profundidad): `amount BETWEEN 500 AND 50000`,
   `term_months BETWEEN 6 AND 60`, `status IN ('PENDING','APPROVED','REJECTED')`.
@@ -270,7 +277,7 @@ backend/
 └── .env.example
 ```
 
-- Las reglas de negocio no conocen HTTP ni MySQL: se prueban sin servidor ni base.
+- Las reglas de negocio no conocen HTTP ni la base de datos: se prueban sin servidor ni base.
 - Los servicios lanzan **excepciones de dominio** (`ApplicationNotFound`, `ApplicationAlreadyDecided`);
   los handlers de `core/` las convierten en respuestas Problem Details. Los endpoints no arman errores a mano.
 - Configuración con variables de entorno (`DATABASE_URL`, orígenes CORS) leídas desde `.env`.
@@ -313,7 +320,7 @@ frontend/src/app/
 ## 9. Fases de trabajo
 
 1. **Base del repositorio:** `.gitignore`, `.env.example`, retirar el PDF con credenciales,
-   `docker-compose.yml` solo con MySQL.
+   `docker-compose.yml` solo con PostgreSQL.
 2. **Backend:** modelo, migración, validaciones, endpoints, manejo de errores y tests.
 3. **Frontend:** Angular conectado al backend real.
 4. **README** completo y verificación de que todo corre desde cero siguiendo el README.
@@ -332,7 +339,7 @@ Las fases 5 y 6 se diseñan en detalle cuando las fases 1–4 estén completas y
   plazo 5 ❌, 6 ✅, 60 ✅, 61 ❌.
 - Transiciones: aprobar o rechazar una pendiente ✅; decidir una ya decidida → 409;
   comentario vacío o muy corto → 422; estado `PENDING` como destino → 422.
-- Endpoints completos con `TestClient` sobre SQLite en memoria (los tests corren sin Docker ni MySQL),
+- Endpoints completos con `TestClient` sobre SQLite en memoria (los tests corren sin Docker ni PostgreSQL),
   incluyendo el formato Problem Details de los errores y el filtro y paginación del listado.
 
 **Frontend:** validación del formulario e interceptor de errores.
@@ -342,7 +349,8 @@ Las fases 5 y 6 se diseñan en detalle cuando las fases 1–4 estén completas y
 - Credenciales solo en `.env` (ignorado por Git); en el repo, `.env.example` con valores de ejemplo.
 - Retirar `Prueba_Bluecore.pdf` del repositorio (contiene credenciales) e ignorar la copia en `docs/`.
   Si el commit inicial ya está publicado, evaluar reescribir el historial (tiene un solo commit).
-- `docker-compose.yml` en la raíz, inicialmente solo con MySQL.
+- `docker-compose.yml` en la raíz, inicialmente solo con PostgreSQL.
+- `db.txt` (DDL de la base `demo` de Bluecore) no se versiona: expone la estructura interna de Bluecore.
 - Entrega: repositorio público en GitHub con `/backend`, `/frontend`, `docker-compose.yml` y `README.md`.
 - **README:** descripción, requisitos previos, cómo correr cada parte paso a paso, cómo correr los
   tests, tabla de endpoints con ejemplos y sección "Decisiones de diseño".

@@ -1,0 +1,9 @@
+.header { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.header h1 { margin: 0; }
+.filters { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.filters button[aria-pressed="true"] { background: var(--color-primary); color: #fff; }
+.row-actions { white-space: nowrap; }
+.row-actions .btn { padding: 0.3rem 0.7rem; margin-right: 0.4rem; }
+.empty { color: var(--color-muted); text-align: center; padding: 2rem 0; }
+.pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
+.alert .btn { margin-left: 0.75rem; }
