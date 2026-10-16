@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import health
 from app.core.config import settings
+from app.core.errors import register_exception_handlers
 
 
 def create_app() -> FastAPI:
@@ -18,6 +19,7 @@ def create_app() -> FastAPI:
         allow_headers=["Content-Type"],
         expose_headers=["Location"],
     )
+    register_exception_handlers(app)
     app.include_router(health.router)
     return app
 

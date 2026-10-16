@@ -13,7 +13,7 @@ from app.models.base import Base
 
 @pytest.fixture
 def db_session() -> Iterator[Session]:
-    # SQLite en memoria: los tests corren sin Docker ni MySQL.
+    # SQLite en memoria: los tests corren sin Docker ni PostgreSQL.
     # StaticPool mantiene una única conexión para que la base no desaparezca entre sesiones.
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
